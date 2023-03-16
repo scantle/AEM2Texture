@@ -9,12 +9,12 @@ program AEM2Texture
   integer                    :: ierr, i, iline, nclasses
   real(8), allocatable       :: ln_shape(:), ln_scale(:)
   character(30)              :: jnk
-  character(60)              :: rho_log_file, tex_out_file
+  character(60)              :: rho_log_file, tex_out_file, prv_log_file
   character(15), allocatable :: tex_names(:)
   real(8),parameter          :: delta = 1d0, zero = 0.0d0
   
   ! Variables read & written
-  integer                    :: id, n
+  integer                    :: id, n, prv_id
   real(8)                    :: x, y, zland, depth, rho
   real(8), allocatable       :: texprob(:)
   character(20)              :: name
@@ -47,6 +47,7 @@ program AEM2Texture
   read(11,*) jnk, nclasses
   read(11,*) jnk, rho_log_file
   read(11,*) jnk, tex_out_file
+  read(11,*) jnk, prv_log_file
   
   ! Allocate texture class arrays
   allocate(tex_names(nclasses), &
@@ -69,17 +70,33 @@ program AEM2Texture
   open(11, file=trim(rho_log_file), iostat=ierr, status='old')
   open(12, file=trim(tex_out_file), iostat=ierr, status='replace')
   
-  ! Read header
-  read(11,*)
   ! Report header read
-  write(6, '(a)') 'Status: Line 1'
+  write(6, '(a)') ' - Status: Line 1'
   ! Write alternate header
   write(12,20) 'Line               ', 'ID', 'n', 'X', 'Y', 'Zland', 'Depth', tex_names
+  
+  ! If present, read/write previous log file as a header
+  if (trim(prv_log_file) /= 'NONE') then
+    write(6, '("+",a)') ' - Copying previous file...'
+    open(13, file=trim(prv_log_file), iostat=ierr, status='old')
+    read(13,*)  !header
+    do while (ierr == 0)
+      read(13,*,iostat=ierr) name, id, n, x, y, zland, depth, texprob
+      write(12,21) name, id, n, x, y, zland, depth, texprob
+    end do
+    close(13)
+    prv_id = id
+  else
+    prv_id = 0
+  end if
+  
+  ! Read rho header
+  read(11,*,iostat=ierr)
   
   iline = 2
   do while (ierr == 0)
     ! Report line
-    write(6, '("+",a,i7)') 'Status: Line', iline
+    write(6, '("+",a,i7,a)') ' - Status: Line', iline, '      '
     ! Read in
     read(11,*,iostat=ierr) name, id, n, x, y, zland, depth, rho
     
@@ -99,12 +116,12 @@ program AEM2Texture
     end if
     
     ! Write out
-    write(12,21) name, id, n, x, y, zland, depth, texprob
+    write(12,21) name, prv_id+id, n, x, y, zland, depth, texprob
     iline = iline + 1
   end do
 
 20 format(a20,2(1x,a5),4(1x,a14),100(3x,a12))    
-21 format(a20,2(1x,i5),4(1x,f14.5),100(3x,es12.6))
+21 format(a20,2(1x,i5),4(1x,f14.5),100(3x,e12.6))
     
   close(11)
   close(12)
