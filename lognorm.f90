@@ -275,13 +275,14 @@ subroutine normal_01_cdf ( x, cdf )
   return
 end
 
-function lognorm_prob(x, delta, mu, sigma) result(prob)
+function lognorm_prob(x, delta, mu, sigma, location) result(prob)
   implicit none
-  real(kind=8), intent(in) :: x, delta, mu, sigma
-  real(kind=8) :: right, left, prob
+  real(kind=8), intent(in) :: x, delta, mu, sigma, location
+  real(kind=8) :: right, left, prob, shifted_x
   
-  call log_normal_cdf(x + delta, mu, sigma, right)
-  call log_normal_cdf(x - delta, mu, sigma, left)
+  shifted_x = x - location
+  call log_normal_cdf(shifted_x + delta, mu, sigma, right)
+  call log_normal_cdf(shifted_x - delta, mu, sigma, left)
   
   prob = right - left
   

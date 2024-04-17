@@ -7,11 +7,11 @@ program AEM2Texture
   ! March 14, 2023 (Pi Day!)
   !-----------------------------------------------------------------------------------------------!
   integer                    :: ierr, i, iline, nclasses
-  real(8), allocatable       :: ln_shape(:), ln_scale(:)
+  real(8), allocatable       :: ln_shape(:), ln_scale(:), ln_loc(:)
   character(30)              :: jnk
   character(60)              :: rho_log_file, tex_out_file, prv_log_file
   character(15), allocatable :: tex_names(:)
-  real(8),parameter          :: delta = 1d0, zero = 0.0d0
+  real(8),parameter          :: delta = 1d0, zero = 0.0d0,cutoff=1d-10
   
   ! Variables read & written
   integer                    :: id, n, prv_id
@@ -35,7 +35,7 @@ program AEM2Texture
   write(*,'(a)') '       _\/\\\_______\/\\\__/\\\\\\\\\\\\\\\_______\/\\\_______ '
   write(*,'(a)') '        _\///________\///__\///////////////________\///________'
   write(*,'(a)') '----------------------------------------------------------------'
-  write(*,'(a)') '                      A E M 2 T e x t u r e   v1.0 '
+  write(*,'(a)') '                     A E M 2 T e x t u r e   v1.01 '
   write(*,'(a)') '-----------------------------------------------------------'
   
   !-----------------------------------------------------------------------------------------------!
@@ -53,11 +53,12 @@ program AEM2Texture
   allocate(tex_names(nclasses), &
            ln_shape (nclasses), &
            ln_scale (nclasses), &
-           texprob  (nclasses))
+           ln_loc   (nclasses), &
+           texprob  (nclasses)  )
   
   read(11,*) jnk   ! Header line
   do i=1, nclasses
-    read(11,*) tex_names(i), ln_shape(i), ln_scale(i)
+    read(11,*) tex_names(i), ln_shape(i), ln_loc(i), ln_scale(i)
   end do
   close(11)
   !-----------------------------------------------------------------------------------------------!
@@ -100,17 +101,23 @@ program AEM2Texture
     ! Read in
     read(11,*,iostat=ierr) name, id, n, x, y, zland, depth, rho
     
-    ! If rho isless than lowest mean, or greater than highest mean, just force to that value
+    ! If rho is less than lowest approx mean, or greater than highest approx mean, just force to that value
     texprob = zero
-    if (rho < minval(ln_scale)) then
-      texprob(minloc(ln_scale)) = 1.0d0
-    else if (rho > maxval(ln_scale)) then
-      texprob(maxloc(ln_scale)) = 1.0d0
+    if (rho < minval(ln_scale+ln_loc)) then
+      texprob(minloc(ln_scale+ln_loc)) = 1.0d0
+    else if (rho > maxval(ln_scale+ln_loc)) then
+      texprob(maxloc(ln_scale+ln_loc)) = 1.0d0
     else
       ! Get texture
       do i=1, nclasses
-        texprob(i) = lognorm_prob(rho, delta, ln_scale(i), ln_shape(i))
+        texprob(i) = lognorm_prob(rho, delta, ln_scale(i), ln_shape(i), ln_loc(i))
+        if (texprob(i) < cutoff) texprob(i) = zero
       end do
+      if (sum(texprob) <= zero) then
+        ! Prevent divide by zero
+        write(*,'(a)') 'ERROR - Probabilities <= 0 for all classes'
+        stop
+      end if
       ! Normalize
       texprob = texprob / sum(texprob)
     end if
@@ -121,7 +128,7 @@ program AEM2Texture
   end do
 
 20 format(a20,2(1x,a5),4(1x,a14),100(3x,a12))    
-21 format(a20,2(1x,i5),4(1x,f14.5),100(3x,e12.6))
+21 format(a20,2(1x,i5),4(1x,f14.5),100(3x,es12.6))
     
   close(11)
   close(12)
