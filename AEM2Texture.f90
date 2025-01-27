@@ -81,9 +81,10 @@ program AEM2Texture
     write(6, '("+",a)') ' - Copying previous file...'
     open(13, file=trim(prv_log_file), iostat=ierr, status='old')
     read(13,*)  !header
+    read(13,*,iostat=ierr) name, id, n, x, y, zland, depth, texprob  ! first line
     do while (ierr == 0)
-      read(13,*,iostat=ierr) name, id, n, x, y, zland, depth, texprob
       write(12,21) name, id, n, x, y, zland, depth, texprob
+      read(13,*,iostat=ierr) name, id, n, x, y, zland, depth, texprob
     end do
     close(13)
     prv_id = id
