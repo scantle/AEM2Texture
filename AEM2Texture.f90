@@ -11,7 +11,7 @@ program AEM2Texture
   character(30)              :: jnk
   character(60)              :: rho_log_file, tex_out_file, prv_log_file
   character(15), allocatable :: tex_names(:)
-  real(8),parameter          :: delta = 1d0, zero = 0.0d0,cutoff=1d-10
+  real(8),parameter          :: delta = 1d0, zero = 0.0d0,cutoff=1d-10,NODATA=-999
   
   ! Variables read & written
   integer                    :: id, n, prv_id
@@ -95,16 +95,20 @@ program AEM2Texture
   ! Read rho header
   read(11,*,iostat=ierr)
   
+  ! Read first line
+  read(11,*,iostat=ierr) name, id, n, x, y, zland, depth, rho
+  
   iline = 2
   do while (ierr == 0)
     ! Report line
     write(6, '("+",a,i7,a)') ' - Status: Line', iline, '      '
-    ! Read in
-    read(11,*,iostat=ierr) name, id, n, x, y, zland, depth, rho
-    
+
     ! If rho is less than lowest approx mean, or greater than highest approx mean, just force to that value
+    ! Also watch out for no data values -999
     texprob = zero
-    if (rho < minval(ln_scale+ln_loc)) then
+    if (rho==NODATA) then
+      texprob = NODATA
+    else if (rho < minval(ln_scale+ln_loc)) then
       texprob(minloc(ln_scale+ln_loc)) = 1.0d0
     else if (rho > maxval(ln_scale+ln_loc)) then
       texprob(maxloc(ln_scale+ln_loc)) = 1.0d0
@@ -125,7 +129,12 @@ program AEM2Texture
     
     ! Write out
     write(12,21) name, prv_id+id, n, x, y, zland, depth, texprob
+    
+    ! Read in (next) line
+    read(11,*,iostat=ierr) name, id, n, x, y, zland, depth, rho
+    
     iline = iline + 1
+    
   end do
 
 20 format(a20,2(1x,a5),4(1x,a14),100(3x,a12))    
